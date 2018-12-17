@@ -1,0 +1,70 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+Draw a heatmap to see the Cinsarc genes expression pattern in all of the 60 samples.
+
+```{r}
+library(tidyverse)
+library(Biobase)
+```
+
+
+```{r}
+# read in the actual genes in the geneset (67 genes)
+cinsarc <- read_delim('../documents/cinsarc.geneset.txt', delim = ' ', col_types = cols(Chromosome = col_character()))
+
+
+featureInfo <- read_csv('../data/feature_info_general.csv', col_types = cols(chromosome_name = col_character()))
+
+# get the ensembl_gene_id of those genes
+Cinsarc <- cinsarc %>%
+  select(ID) %>%
+  rename(external_gene_name = ID) %>%
+  left_join(featureInfo, by = 'external_gene_name') %>%
+  filter(!duplicated(external_gene_name))
+```
+
+```{r}
+# extract the counts data of those genes in the 60 samples(filtered).
+eset <- read_rds('../../../samples/filtered_eset_60samples_raw_17596features.RDS')
+
+cin_eset <- eset[featureNames(eset) %in% Cinsarc$ensembl_gene_id,]
+```
+
+```{r}
+# draw heatmap
+
+# make the eset rownames be the gene symbol
+fea_table <- data.frame(ensembl_gene_id = featureNames(cin_eset)) %>%
+  left_join(Cinsarc, by = 'ensembl_gene_id')
+featureNames(cin_eset) <- fea_table$external_gene_name
+
+library(pheatmap)
+
+colGradient <- function( cols, length, cmax=255 )
+{ ramp <- colorRamp(cols)
+  rgb( ramp(seq(0,1,length=length)), max=cmax )
+}
+
+bwrPalette <- colGradient(c("blue","white","red"),length=11) 
+
+
+annot <- data.frame(
+  row.names = sampleNames(cin_eset),
+  Status = pData(cin_eset)$group,
+  Batch = pData(cin_eset)$batch
+)
+
+pheatmap(exprs(cin_eset),
+        color=bwrPalette, 
+        annotation_col = annot,
+        show_rownames = TRUE,
+        show_colnames = TRUE,
+        scale = "row",
+        filename = '../figs/Cinsarc_geneset_exprs_heatmap.jpg',
+        width = 11,
+        height = 10)
+```
+
