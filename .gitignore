@@ -1,0 +1,9 @@
+*.DS_Store
+samples/*
+reference/*
+analysis/*/documents/*
+analysis/*/data/*
+analysis/*/output/*
+analysis/*/figs/*
+analysis/*/report/*.html
+
