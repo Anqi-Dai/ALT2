@@ -28,18 +28,25 @@ Cinsarc <- cinsarc %>%
 
 ```{r}
 # extract the counts data of those genes in the 60 samples(filtered).
-eset <- read_rds('../../../samples/filtered_eset_60samples_raw_17596features.RDS')
+eset <- read_rds('../../../samples/filtered_eset_60samples_17596features.RDS')
 
 cin_eset <- eset[featureNames(eset) %in% Cinsarc$ensembl_gene_id,]
-```
-
-```{r}
-# draw heatmap
 
 # make the eset rownames be the gene symbol
 fea_table <- data.frame(ensembl_gene_id = featureNames(cin_eset)) %>%
   left_join(Cinsarc, by = 'ensembl_gene_id')
 featureNames(cin_eset) <- fea_table$external_gene_name
+```
+
+```{r log2_cor_hm}
+# draw heatmap
+
+# **To calculate correlation, the count matrix need to be log2 transformed to have that normal distribution**
+log2cin_eset <- cin_eset
+exprs(log2cin_eset) <- log2(exprs(cin_eset) + 1)
+
+# **Removing FOB.2 since it looks like it's very different from others and dragging the heatmap colors**
+log2cin_eset <- log2cin_eset[,sampleNames(log2cin_eset) != 'FOB.2']
 
 library(pheatmap)
 
@@ -52,14 +59,13 @@ bwrPalette <- colGradient(c("blue","white","red"),length=11)
 
 
 annot <- data.frame(
-  row.names = sampleNames(cin_eset),
-  Status = pData(cin_eset)$group,
-  Batch = pData(cin_eset)$batch
+  row.names = sampleNames(log2cin_eset),
+  Status = pData(log2cin_eset)$group,
+  Batch = pData(log2cin_eset)$batch
 )
 
 
-
-pheatmap(exprs(cin_eset),
+pheatmap(exprs(log2cin_eset),
         color=bwrPalette, 
         annotation_col = annot,
         show_rownames = TRUE,
@@ -70,5 +76,41 @@ pheatmap(exprs(cin_eset),
         filename = '../figs/Cinsarc_geneset_exprs_heatmap_correlation.jpg',
         width = 11,
         height = 10)
+```
+
+```{r euclidian_hm}
+# draw heatmap
+
+# **Removing FOB.2 since it looks like it's very different from others and dragging the heatmap colors**
+cin_eset <- cin_eset[,sampleNames(cin_eset) != 'FOB.2']
+
+
+annot <- data.frame(
+  row.names = sampleNames(cin_eset),
+  Status = pData(cin_eset)$group,
+  Batch = pData(cin_eset)$batch
+)
+
+
+pheatmap(exprs(cin_eset),
+        color=bwrPalette, 
+        annotation_col = annot,
+        show_rownames = TRUE,
+        show_colnames = TRUE,
+        scale = "row",
+        filename = '../figs/Cinsarc_geneset_exprs_heatmap.jpg',
+        width = 11,
+        height = 10)
+
+```
+
+The heatmap is hard to interpretate. Do the GSEA instead to see the cinsarc geneset enrichment in our genes, which can tell whether the geneset is relavant to ALT. (20181219)
+
+```{r}
+# output the geneset to make a gmt file (https://software.broadinstitute.org/cancer/software/gsea/wiki/index.php/Data_formats)
+# the genes need to be in a row
+cinsarc_genes <- paste(Cinsarc$external_gene_name, collapse = ',')
+write.csv(cinsarc_genes, '../data/cinsarc_geneset.csv', col.names  = F, quote = F, row.names = F)
+
 ```
 

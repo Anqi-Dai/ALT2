@@ -1,0 +1,6 @@
+'''
+This Snakefile will do the following:
+* calculate normalized enrichment score of the cinsarc geneset in our samples using detk enrichment module
+'''
+
+
