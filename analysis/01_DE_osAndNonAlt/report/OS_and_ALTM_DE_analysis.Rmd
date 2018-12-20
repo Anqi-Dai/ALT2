@@ -1,18 +1,42 @@
 ---
-title: "R Notebook"
-output: html_notebook
+title: "Identifying the most downregulated genes in OS1/OS2 compared to ALT- samples"
+mainfont: Arial
+author: Angel
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    theme: united
+    code_folding: hide
+    tufte::tufte_html: default
 ---
 
-```{r}
-library(tidyverse)
-library(VennDiagram)
+```{r setup, include=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE)
 ```
 
 
 ```{r}
+library(tidyverse)
+library(VennDiagram)
+library(biomaRt)
+library(kableExtra)
+```
+
+# Filtering prior to DE(differential expression)
+
+* Remove genes with low expressions: remove those genes without at least 1 read per million in at least 'n' samples, n = least amount of samples in a condition (when comparing 3 OS1 samples to 15 ALT- samples, n = 3). This brings gene number to do hypothesis testing from ~58000 to ~24000. 
+
+# Filtering the DE results from detk deseq2 methods to get the significant genes (FDR < 0.05)
+
+```{r}
 # load the detk de results file
 
-fns <- list.files('../output', full.names = T)
+fns <- list.files('../output', pattern = '^deseq2',full.names = T)
+
+#sapply(lapply(fns, function(fn){
+#  read_tsv(fn) 
+#}), nrow) 
 
 readDEresults <- function(fn){
   ret = read_tsv(fn) %>%
@@ -26,9 +50,9 @@ res_list <- lapply(fns, readDEresults)
 
 ```{r}
 # how many genes are significant in each of them
-sapply(res_list, nrow) 
+#sapply(res_list, nrow) 
 ```
-```{r}
+```{r eval=FALSE}
 # drawing venn diagram to see the overlap
 diff_list <- list(OS1 = res_list[[1]]$ensembl_gene_id,
                   OS1OS2 = res_list[[2]]$ensembl_gene_id,
@@ -46,4 +70,190 @@ png('../figs/Overlap of Sig genes among 3 DE.png', width = 4, height = 4, units 
 grid.draw(venn)
 dev.off()
 ```
+
+```{r eval=FALSE}
+# have the DE genes that are overlapped in the three and take the log2FC from the OS1OS2 comparison and make it into a named numeric vector
+DE_gene_ID <- intersect(res_list[[1]]$ensembl_gene_id, res_list[[2]]$ensembl_gene_id)
+DE_gene_ID <- intersect(DE_gene_ID,res_list[[3]]$ensembl_gene_id )
+
+DE_genes <- res_list[[2]] %>%
+  dplyr::select(ensembl_gene_id, group__OS__log2FoldChange)  %>%
+  filter(ensembl_gene_id %in% DE_gene_ID)
+
+# convert the ensembl geneID to entrez gene IDs
+library(biomaRt)
+ensembl.genes <- DE_genes$ensembl_gene_id
+mart <- useDataset("hsapiens_gene_ensembl", useMart("ensembl"))
+genes <- getBM(
+  filters="ensembl_gene_id",
+  attributes=c("ensembl_gene_id", "entrezgene"),
+  values=ensembl.genes,
+  mart=mart)
+
+entrez_genes_df <- genes %>%
+  filter(!duplicated(ensembl_gene_id)) %>%
+  filter(!duplicated(entrezgene)) %>%
+  left_join(DE_genes, by = 'ensembl_gene_id') 
+
+entrez_genes <- entrez_genes_df %>%
+  pull(group__OS__log2FoldChange)
+names(entrez_genes) <- entrez_genes_df$entrezgene
+
+# this is the DE genelist
+head(entrez_genes)
+length(entrez_genes)
+# see the log2FC distribution
+hist(entrez_genes, breaks = seq(-12, 13, 0.2))
+```
+
+```{r eval=FALSE}
+# to have the gene symbol for the DE genes for the Metascape
+featureInfo <- read_csv('../../02_cinsarc/data/feature_info_general.csv')
+
+
+featureDE <- featureInfo %>%
+  filter(ensembl_gene_id %in% entrez_genes_df$ensembl_gene_id)
+
+write.table(featureDE$external_gene_name, '../output/DE_overlap_gene_name.csv', col.names = F, quote = F, row.names = F)
+```
+
+
+# Looking for genes that are most downregulated in OS1/OS2 compared to ALT- samples.
+
+### Visualize the significant genes -- baseMean VS log2FoldChange.
+
+* baseMean: the mean of normalized counts of all samples, normalizing for sequencing depth.
+* log2FoldChange: log2(ratio of OS sample counts and ALT- sample counts)
+* padj shown as proportional to the size of the dots
+
+
+```{r}
+# get the most downregulated genes in the OS1 and OS2, that might be the gene loss and it might be the reason why it's ALT.
+OS1 = res_list[[1]]
+OS1OS2 = res_list[[2]]
+OS2 = res_list[[3]]
+
+library(ggpubr)
+# get the group__OS__log2FoldChange < 0 that means the gene is down regulated in OS
+OS1_down <- OS1 %>%
+  filter(group__OS__log2FoldChange < 0) %>%
+  mutate(log10P = -log10(group__OS__padj))
+
+
+  
+names(res_list) <- c('OS1','OS1OS2','OS2')
+
+down_os <- lapply(c(1,2,3), function(i){
+  ret = res_list[[i]] %>%
+    filter(group__OS__log2FoldChange < 0) %>%
+    mutate(log10P = -log10(group__OS__padj)) %>%
+    mutate(Group = names(res_list)[i])
+})
+
+down_all <- bind_rows(down_os) %>%
+  mutate(Group = factor(Group, levels = c('OS1','OS2', 'OS1OS2'))) 
+
+down_all %>%
+  dplyr::select(baseMean, group__OS__log2FoldChange,group__OS__padj, Group) %>%
+  ggplot(aes(x = group__OS__log2FoldChange, y = baseMean, size = group__OS__padj)) +
+  geom_point(alpha = 1/10) +
+  labs(x = 'log2FoldChange', 
+       y = 'log10(baseMean)',
+       title = 'baseMean VS log2FoldChange in significant genes')+
+  scale_y_log10() +
+  facet_wrap(~Group, scales = "free") +
+  ggsave('../figs/baseMean VS log2FoldChange in significant genes.jpg', width = 10, height = 8)
+
+write_csv(down_all %>%
+            dplyr::select(1:7, Group), '../output/Downregulated_significant_genes_in_three_DE.csv')
+```
+
+
+### Selecting genes that have baseMean > 1000 and log2FoldChange < -5 
+
+* How many genes pass this filtering in each of the comparison:
+
+```{r}
+# select the genes that have base mean > 1000 and log2FC < -5
+down_all_fil <- down_all %>%
+  filter(baseMean > 1000 & group__OS__log2FoldChange < -5)
+
+down_all_fil %>%
+  group_by(Group) %>%
+  summarise(Num = n()) %>%
+  kable() %>%
+  kable_styling(full_width = F)
+
+
+```
+
+* How many genes are overlapped in those three:
+
+
+```{r}
+# is there any overlap between those genes
+down_all_fil_gene <- down_all_fil %>%
+  dplyr::select(ensembl_gene_id, baseMean, group__OS__log2FoldChange,group__OS__padj, Group)
+
+OS1_specific <- down_all_fil_gene %>%
+  filter(Group == 'OS1')%>%
+  pull(ensembl_gene_id)
+
+OS2_specific <- down_all_fil_gene %>%
+  filter(Group == 'OS2')%>%
+  pull(ensembl_gene_id)
+
+OS1OS2_specific <- down_all_fil_gene %>%
+  filter(Group == 'OS1OS2') %>%
+  pull(ensembl_gene_id)
+
+ol <- intersect(OS1_specific, OS2_specific)
+ol <- intersect(ol, OS1OS2_specific)
+length(ol)
+
+```
+
+* Visualize the overlapped genes in the same baseMean VS log2FoldChange plot.
+
+```{r}
+
+down_all_fil_gene_ol62 <- down_all_fil_gene %>%
+  filter(ensembl_gene_id %in% ol) 
+
+down_all_fil_gene_ol62 %>%
+  ggplot(aes(x = group__OS__log2FoldChange, y = baseMean, size = group__OS__padj)) +
+  geom_point() +
+  scale_y_log10() +
+  facet_wrap(~Group, scales = "free") +
+  labs(x = 'log2FoldChange', 
+       y = 'log10(baseMean)',
+       title = 'baseMean VS log2FoldChange in significant filtered genes') +
+  ggsave('../figs/baseMean VS log2FoldChange in significant filtered genes.jpg', width = 10, height = 8)
+
+
+```
+
+* Those genes information:
+
+```{r}
+# those overlap down genes information
+ensembl.genes <- ol
+mart <- biomaRt::useDataset("hsapiens_gene_ensembl", useMart("ensembl"))
+genes <- getBM(
+  filters="ensembl_gene_id",
+  attributes=c("ensembl_gene_id","external_gene_name", "chromosome_name", 'start_position','end_position', 'description'),
+  values=ensembl.genes,
+  mart=mart) 
+
+genes <- genes %>%
+  rename(Chr = chromosome_name, Start = start_position, End = end_position)
+
+genes %>%
+  kable(caption = 'Ovelapped downregulated genes information that pass the filtering among the three DE') %>%
+  kable_styling()
+
+```
+
+
+
 
