@@ -1,0 +1,38 @@
+'''
+Running detk de using raw salmon counts and pheno data
+'''
+
+rule DE1:
+    input:
+        cts='data/raw_cts_OS1_and_ALTM.csv',
+        pheno='data/pheno_OS1_and_ALTM.csv'
+    output:
+        'output/deseq2_OS1_and_ALTM_results.csv'
+    shell:
+        '''
+        detk-de deseq2 "counts ~ group + batch " {input.cts} {input.pheno} > {output}
+        '''
+
+
+rule DE2:
+    input:
+        cts='data/raw_cts_OS2_and_ALTM.csv',
+        pheno='data/pheno_OS2_and_ALTM.csv'
+    output:
+        'output/deseq2_OS2_and_ALTM_results.csv'
+    shell:
+        '''
+        detk-de deseq2 "counts ~ group + batch " {input.cts} {input.pheno} > {output}
+        '''
+
+
+rule DE3:
+    input:
+        cts='data/raw_cts_OS1OS2_and_ALTM.csv',
+        pheno='data/pheno_OS1OS2_and_ALTM.csv'
+    output:
+        'output/deseq2_OS1OS2_and_ALTM_results.csv'
+    shell:
+        '''
+        detk-de deseq2 "counts ~ group + batch " {input.cts} {input.pheno} > {output}
+        '''
