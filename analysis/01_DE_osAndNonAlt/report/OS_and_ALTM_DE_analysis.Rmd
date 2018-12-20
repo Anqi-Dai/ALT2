@@ -5,6 +5,7 @@ output: html_notebook
 
 ```{r}
 library(tidyverse)
+library(VennDiagram)
 ```
 
 
@@ -21,12 +22,28 @@ readDEresults <- function(fn){
 }
 
 res_list <- lapply(fns, readDEresults)
-
-
 ```
 
 ```{r}
 # how many genes are significant in each of them
-sapply(res_list, nrow)
+sapply(res_list, nrow) 
+```
+```{r}
+# drawing venn diagram to see the overlap
+diff_list <- list(OS1 = res_list[[1]]$ensembl_gene_id,
+                  OS1OS2 = res_list[[2]]$ensembl_gene_id,
+                  OS2 = res_list[[3]]$ensembl_gene_id)
+fill <- c("light blue", "pink", 'yellow')
+size  <- rep(0.5, 3)
+venn <- venn.diagram(x = diff_list, 
+      filename = NULL,
+      height = 2000,
+      width = 2000, fill = fill,
+      cat.default.pos = "text", 
+      cat.cex = size,
+      main = "Overlap of Sig genes among 3 DE");
+png('../figs/Overlap of Sig genes among 3 DE.png', width = 4, height = 4, units = 'in', res = 300)
+grid.draw(venn)
+dev.off()
 ```
 
