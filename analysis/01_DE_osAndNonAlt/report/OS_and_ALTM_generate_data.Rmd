@@ -1,0 +1,104 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+```{r}
+library(tidyverse)
+library(Biobase)
+```
+
+
+```{r}
+# get the pheno info from the eset that I have
+pheno <- pData(read_rds('../../../samples/filtered_eset_60samples_17596features.RDS'))
+
+rownames(pheno)
+# load the raw cts matrix and select the certain samples that I wanna do norm and DE with
+CTS <- read.csv('../data/raw_salmon_cts_60samples_58174features.csv', row.names = 1) 
+
+CTS <- CTS[,rownames(pheno)]
+
+ALTM_sample_name <- pheno %>%
+  mutate(Sample = rownames(.)) %>%
+  filter(group == 'ALTM') %>%
+  pull(Sample)
+
+```
+
+```{r}
+# build a eset cuz it will make things easier later
+
+normeset <- read_rds('../../../samples/normalized_whole_eset_60samples_57955features.RDS')
+
+featureDF <- fData(normeset)
+CTS <- CTS[rownames(CTS) %in% rownames(featureDF),]
+CTS <- CTS[rownames(featureDF),]
+
+phenoData <- new("AnnotatedDataFrame", data = pheno)
+featureData <- new('AnnotatedDataFrame', data = featureDF)
+
+# the whole expression set, including 60 samples.
+rawEset <- ExpressionSet(assayData=as.matrix(CTS), 
+                        phenoData=phenoData, 
+                        featureData= featureData)
+
+write_rds(rawEset, '../../../samples/RAW_whole_eset_60samples_57955features.RDS')
+
+```
+
+```{r}
+# function to filter the monti way
+## remove those genes without at least 1 read per million in at least 'n' samples 
+## n = least amount of samples in a condition (4 in example)
+
+removeLowExpression <- function(eset, class_id)
+{
+  groups <- pData(eset)[,class_id]
+  min.samples <- min( sapply(levels(groups), function(x){length(which(groups %in% x))}) )
+  rpm <- colSums(exprs(eset))/1000000
+  filter_ind <- t(apply(exprs(eset), 1,function(x) {x >rpm}))
+  filter_ind_rowsums <- apply(filter_ind, 1, sum)
+  return(eset[filter_ind_rowsums > min.samples,])
+}
+```
+
+```{r}
+# OS1 and ALTM
+
+eset1 <- rawEset[,grepl('OS1\\.',sampleNames(rawEset)) | sampleNames(rawEset) %in% ALTM_sample_name]
+
+# filter 
+esetDE1 <- removeLowExpression(eset = eset1, class_id = "group")
+
+# output those tables
+write.csv(exprs(esetDE1), '../data/raw_cts_OS1_and_ALTM.csv',  quote = F, row.names = T)
+write.csv(pData(esetDE1), '../data/pheno_OS1_and_ALTM.csv', quote = F, row.names = T)
+```
+
+```{r}
+# OS2 and ALTM
+
+eset2 <- rawEset[,grepl('OS2\\.',sampleNames(rawEset)) | sampleNames(rawEset) %in% ALTM_sample_name]
+
+# filter 
+esetDE2 <- removeLowExpression(eset = eset2, class_id = "group")
+
+# output those tables
+write.csv(exprs(esetDE2), '../data/raw_cts_OS2_and_ALTM.csv',  quote = F, row.names = T)
+write.csv(pData(esetDE2), '../data/pheno_OS2_and_ALTM.csv', quote = F, row.names = T)
+
+```
+
+```{r}
+# OS1 and OS2 and ALTM
+
+eset3 <- rawEset[,grepl('OS2\\.|OS1\\.',sampleNames(rawEset)) | sampleNames(rawEset) %in% ALTM_sample_name]
+
+# filter 
+esetDE3 <- removeLowExpression(eset = eset3, class_id = "group")
+
+# output those tables
+write.csv(exprs(esetDE3), '../data/raw_cts_OS1OS2_and_ALTM.csv',  quote = F, row.names = T)
+write.csv(pData(esetDE3), '../data/pheno_OS1OS2_and_ALTM.csv', quote = F, row.names = T)
+```
+

@@ -1,0 +1,22 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(kableExtra)
+```
+
+
+```{r}
+# the results from detk enrich run
+enr <- read_csv('../output/cinsarc_enrich.txt')
+
+enr$leadingEdge
+
+enr %>%
+  kable() %>%
+  kable_styling()
+```
+

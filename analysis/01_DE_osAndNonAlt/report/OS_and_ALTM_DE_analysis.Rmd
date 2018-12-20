@@ -1,0 +1,32 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+```
+
+
+```{r}
+# load the detk de results file
+
+fns <- list.files('../output', full.names = T)
+
+readDEresults <- function(fn){
+  ret = read_tsv(fn) %>%
+    rename(ensembl_gene_id = X) %>%
+    filter(group__OS__padj < 0.05)
+  return(ret)
+}
+
+res_list <- lapply(fns, readDEresults)
+
+
+```
+
+```{r}
+# how many genes are significant in each of them
+sapply(res_list, nrow)
+```
+
