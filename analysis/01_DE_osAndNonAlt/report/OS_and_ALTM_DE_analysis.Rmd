@@ -12,7 +12,7 @@ output:
 ---
 
 ```{r setup, include=FALSE, message=FALSE}
-knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE)
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE, fig.width=12, fig.height=8)
 ```
 
 
@@ -215,7 +215,7 @@ length(ol)
 
 * Visualize the overlapped genes in the same baseMean VS log2FoldChange plot.
 
-```{r}
+```{r }
 
 down_all_fil_gene_ol62 <- down_all_fil_gene %>%
   filter(ensembl_gene_id %in% ol) 
