@@ -6,4 +6,4 @@ analysis/*/data/*
 analysis/*/output/*
 analysis/*/figs/*
 analysis/*/report/*.html
-
+analysis/*/.*

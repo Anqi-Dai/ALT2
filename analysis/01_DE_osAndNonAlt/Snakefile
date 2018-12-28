@@ -1,6 +1,10 @@
 '''
 Running detk de using raw salmon counts and pheno data
 '''
+rule all:
+    input:
+        'output/deseq2_OS1_and_ALTM_results.csv','output/deseq2_OS2_and_ALTM_results.csv','output/deseq2_OS1OS2_and_ALTM_results.csv'
+
 
 rule DE1:
     input:

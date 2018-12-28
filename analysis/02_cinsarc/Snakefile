@@ -3,4 +3,12 @@ This Snakefile will do the following:
 * calculate normalized enrichment score of the cinsarc geneset in our samples using detk enrichment module
 '''
 
-
+rule detk_enrich_run:
+    input:
+        gmt='data/cinsarc_geneset_tab.gmt',
+        results='data/firth_res_all_genes.csv'
+    output:
+        'output/cinsarc_enrich.txt'
+    shell:
+        'detk-enrich fgsea -o {output} -i external_gene_name  -c counts__beta \
+            {input.gmt} {input.results}'
