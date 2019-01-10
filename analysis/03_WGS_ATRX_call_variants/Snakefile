@@ -1,0 +1,25 @@
+import json
+
+sample_dir = '/usr4/bs831/adai/bubhub-home/newFlynn/flynn_altstatus/analysis/phs000699/phs000699/fastq'
+
+sample_names = json.load(open('/usr4/bs831/adai/bubhub-home/newFlynn/flynn_altstatus/analysis/genomicAnalysis/wgs_ALL_samples.json')).keys()
+
+
+rule all:
+    input:
+        expand('{sample_dir}/{sample_names}_bwa_sorted.bam.bai', sample_dir = sample_dir, sample_names = sample_names)
+
+
+# produce the index of the sorted bwa bam files for the wgs data
+
+rule index_sorted_bam:
+    input:
+        '{sample_dir}/{sample_names}_bwa_sorted.bam'
+    output:
+        '{sample_dir}/{sample_names}_bwa_sorted.bam.bai'
+    threads:
+        8
+    shell:
+        'samtools index {input}'
+
+
