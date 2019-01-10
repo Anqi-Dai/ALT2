@@ -1,0 +1,37 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(DOSE)
+```
+
+```{r}
+# Over Representation Analysis
+geneList <- entrez_genes
+de <- names(geneList)
+edo <- enrichDGN(de)
+
+```
+
+```{r}
+# visualization
+## count the gene number
+endf <- edo@result %>%
+  separate(GeneRatio, into = c('numerator','denominator'), convert = T) %>%
+  mutate(geneRatioNum = numerator/denominator) %>%
+  top_n(50)
+
+
+## plot
+library(forcats) ## for reordering the factor
+ggplot(endf, aes(x = geneRatioNum, y = fct_reorder(Description, geneRatioNum))) + 
+               geom_point(aes(size = geneRatioNum, color = p.adjust)) +
+               theme_bw(base_size = 14) +
+        scale_colour_gradient(limits=c(0, 0.10), low="red") +
+        ylab(NULL) +
+        ggtitle("Disease Ontology enrichment")
+```
+

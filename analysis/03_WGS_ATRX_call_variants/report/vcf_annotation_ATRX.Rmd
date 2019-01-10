@@ -1,0 +1,133 @@
+---
+title: "ATRX mutation in the dbGaP WGS samples"
+mainfont: Arial
+author: Angel
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    theme: united
+    code_folding: hide
+    tufte::tufte_html: default
+---
+
+```{r setup, include=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE)
+```
+
+
+
+
+
+Organize the ann.vcf results (only the non-empty files are kept) from snpeff and put them into a table for later check in IGV.
+
+```{r}
+library(tidyverse)
+library(knitr)
+library(ggpubr)
+library(kableExtra)
+```
+
+
+```{r}
+ann <- data_frame(
+  Sample = list.files('../data/WGS26_annotated_vcf', pattern = 'ann.vcf'),
+  fns = list.files('../data/WGS26_annotated_vcf', pattern = 'ann.vcf', full.names = T)
+) %>%
+  mutate(contents = map(fns , ~ read_tsv(., comment = '##', col_names = F, col_types = cols(.default = "c")))) %>%
+  dplyr::select(- fns) %>%
+  mutate(Sample = str_replace_all(Sample, '_atrx.ann.vcf','')) %>%
+  unnest() %>%
+  separate(X8, into = c('rm','keep'), sep = 'ANN=') %>%
+  dplyr::select(- rm) %>%
+  separate(keep, into = c('kp','rm'), sep = 'ATRX') %>%
+  dplyr::select(- rm) %>%
+  rename(Coord = X2) %>%
+  group_by(Sample, Coord, kp)%>%
+  distinct() %>%
+  rename(VarType = kp)
+```
+
+## Variants type distribution
+
+```{r fig.height=8,fig.width=10}
+# visualize the varType
+ann %>%
+  dplyr::select(Sample, Coord, VarType) %>%
+  separate(VarType, into = c('VarType', 'rm'), sep ='_variant') %>%
+  dplyr::select(- rm) %>%
+  group_by(VarType) %>%
+  summarise(cnt = n()) %>%
+  ggbarplot(x = 'VarType', y = 'cnt', 
+            label = T, color = 'VarType',fill = 'VarType', 
+            palette = 'lancet',
+            title = 'Variants type distribution',
+            xlab = 'Variants type (please ignore the "G|" stuff before the actual type)'
+            ) + 
+  rotate_x_text()
+
+
+```
+
+
+## filtering out variants at UTR or are synonymous
+
+```{r}
+# filtering to remove the variants with UTR or synonymous
+ann_fil <- ann %>%
+  filter(!grepl(pattern = 'UTR|synonymous',x = VarType))
+
+
+# many of them actually happen at the same position
+ann_fil %>%
+  dplyr::select(Sample, Coord, VarType) %>%
+  group_by(Coord) %>%
+  summarise(cnt = n()) %>%
+  kable(caption = 'The frequency of a variant at a certain location') %>%
+  kable_styling(full_width = T)
+
+# a table of those 
+ann_fil %>%
+  dplyr::select(Sample, Coord, VarType) %>%
+  arrange(Coord) %>%
+  kable(caption = 'A table showing the nonsynonymous mutation and its location in a given sample') %>%
+  kable_styling()
+```
+
+```{r}
+#  I should put that into a igv batch script
+
+prefix <- normalizePath('../../../../../../../Downloads/git_repo/newFlynn1802/flynn_altstatus/analysis/interested.genes/DbGaP.sample.extract.target.genes.Nov9/SRR1701087_extract_WGS.bam') %>%
+  str_split(pattern = 'SRR',simplify = T)
+
+coord471_bam <- ann_fil %>%
+  filter(Coord == '77682471') %>%
+  mutate(fns = paste(Sample, '_extract_WGS.bam', sep = '')) %>%
+  mutate(fullPath = paste(prefix[1,1], fns, sep = ''))%>%
+  pull(fullPath) %>%
+  paste(collapse = ',')
+
+
+```
+
+
+## IGV screenshot to double check
+
+### The IGV screenshot of the sample that have a frameshift mutation.
+
+```{r }
+knitr::include_graphics('../../../../../../../IGV_save/ATRX_wgs/WGS_245_frameshift.png')
+```
+
+### The IGV screenshot of the samples that have a missense mutation at 77682471 that turns a Leu to a Val.  
+
+```{r }
+knitr::include_graphics('../../../../../../../IGV_save/ATRX_wgs/chrX_77,682,451_77,682,491.png')
+```
+
+### The IGV screenshot of the sample that has a missense mutation at 77683580 that turns a Ser to a Ile. (The table shows that it's a stop_gained mutation I think because it overlooks that this gene is transcribed in the reverse strand.)
+
+```{r}
+knitr::include_graphics('../../../../../../../IGV_save/ATRX_wgs/WGS_366_missense.png')
+```
+
