@@ -1,0 +1,112 @@
+---
+title: "check_ETAA1_and_TOPBP1_counts"
+author: "Angel"
+date: "1/14/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE) 
+```
+
+```{r}
+library(tidyverse)
+library(ggpubr)
+library(Biobase)
+```
+
+```{r}
+# use the raw data and provide the pheno data with the samples you are interested in and normalize them only using DETK
+
+# load the raw RDS file
+dat <- read_rds('../../../samples/RAW_whole_eset_60samples_57955features.RDS')
+
+cts <- exprs(dat)
+
+pheno <- pData(dat)[pData(dat)$group != 'OS',]
+pheno$CLname <- c(rep('HUO3N1',3),
+              rep('hFOB1.19',3),
+              rep('HOS',3),
+              rep('MG63',3),
+              rep('SJSA1',3),
+              rep('CAL72',3),
+              rep('CAL78',3),
+              rep('G292',3),
+              rep('NOS',3),
+              rep('NY',3),
+              rep('SAOS2',3),
+              rep('U2OS',3),
+              rep('HUO9',3))
+
+# write out those tables for processing in detk, and be sure to write out the row names as well
+write.csv(cts, '../data/raw_whole_eset_60samples_57955features_counts.csv', row.names = T, quote = F)
+
+write.csv(pheno, '../data/pheno_of_only_cell_lines.csv', row.names = T, quote = F)
+
+# or if that can't work, I direcly subset the matrix myself first
+cl <- cts[,colnames(cts) %in% rownames(pheno)]
+
+write.csv(cl, '../data/raw_cell_lines_39samples_57955features_counts.csv', row.names = T, quote = F)
+
+```
+
+```{r}
+# detk command
+#detk-norm deseq2 -o norm_cell_lines_39samples_57955features_counts.csv raw_cell_lines_39samples_57955features_counts.csv
+```
+
+```{r}
+# load the normlized data
+normCL <- read.csv('../data/norm_cell_lines_39samples_57955features_counts.csv', row.names = 1)
+  
+# ETAA1 TOPBP1
+target <- normCL[rownames(normCL) %in% c('ENSG00000143971','ENSG00000163781'),] 
+
+df <- t(target)  %>%
+  as.data.frame %>%
+  rename(ETAA1 = names(.)[1], TOPBP1= names(.)[2]) %>%
+  rownames_to_column %>%
+  left_join(pheno %>%
+              rownames_to_column, by = 'rowname') %>%
+  mutate(Coord = sort(c(seq(1, 49,4), seq(2, 50,4), seq(3, 51,4))),
+         group = as.character(group),
+         group = ifelse(group == 'ALTM','ALT-','ALT+')) %>%
+  dplyr::select(Coord, CLname, group, ETAA1:TOPBP1) %>%
+  gather(key = 'Gene', value = 'Cts' , ETAA1:TOPBP1) %>%
+  mutate(Gene = as.factor(Gene))
+
+ 
+xlabel <- data.frame(
+  Sample = unique(df$CLname),
+  breaks = seq(2, 50,4)
+) 
+
+Col <- c('#00468B', '#EC0000','#42B440')
+```
+
+
+```{r}
+# plot
+df %>%
+ggplot(aes(x = Coord, y = Cts,  color = group, fill = group)) +
+  geom_bar(stat="identity", width = 0.6) +  
+  scale_x_continuous(breaks = xlabel$breaks,
+                     labels = xlabel$Sample,
+                     expand=c(0,0)) +
+  labs(x = '',
+       y = 'Normalized counts',
+       title = 'Normalized counts of ETAA1 and TOPBP1 in cell lines ') +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.text=element_text(size=10),
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "black"),
+        panel.border = element_rect(colour = "black", fill=NA, size=0.5),
+        strip.text.x = element_text(size = 12),
+        strip.background = element_rect(color = "black", size = 0.5),
+        legend.position="bottom") + 
+  scale_fill_manual(values = Col) +
+  scale_color_manual(values = Col)  +
+  facet_wrap(. ~ Gene) +
+  ggsave('../figs/Normalized counts of ETAA1 and TOPBP1 in cell lines.jpg', width = 12, height =8, dpi = 300)
+```
+
