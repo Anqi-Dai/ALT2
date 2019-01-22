@@ -1,7 +1,13 @@
 '''
 This Snakefile will do the following:
-* calculate normalized enrichment score of the cinsarc geneset in our samples using detk enrichment module
+* calculate normalized enrichment score of the cinsarc geneset in our cell line samples using detk enrichment module and the DE statistics from the cell lines.
+
+* see Cinsarc signature is correlated with SLX4IP deletion in our tumor samples(PDX) by doing a DE between the 3 SLX4IP deletion tumor samples and 4 
+that still have it
+* calculate normalized enrichment score 
+
 '''
+# this is using the cell line DE Firth statistics 
 
 rule detk_enrich_run:
     input:
@@ -12,3 +18,52 @@ rule detk_enrich_run:
     shell:
         'detk-enrich fgsea -o {output} -i external_gene_name  -c counts__beta \
             {input.gmt} {input.results}'
+
+
+
+
+# DE between the 3 SLX4IP deletion tumor samples and 4 that still have it
+#   At first I met some problems in jsonlite, but it got fixed after I installed that through conda. 
+
+
+# I need to filter out those rows with too many zeros
+# the current criterion is that there should not be any zeros in a given row
+
+rule count_matrix_filter:
+    input:
+        'data/SLX4IP_counts_PDX.csv'
+    output:
+        'data/SLX4IP_counts_PDX_filtered.csv'
+    shell:
+        '''
+        detk-filter -o {output} 'zero(all) == 0' {input} 
+        '''
+
+rule DE_in_PDX:
+    input:
+        pheno='data/SLX4IP_pheno_PDX.csv',
+        cts='data/SLX4IP_counts_PDX_filtered.csv'
+    output:
+        'output/deseq2_SLX4IP_status_DE_results.csv'
+    shell:
+        '''
+        detk-de deseq2 "counts ~ SLX4IPstatus + batch " {input.cts} {input.pheno} > {output}
+        '''
+
+# annotate the deseq2 results using piomart. Thank you Diego!
+
+rule download_gtf:
+    output:
+        'homo_sapiens_grch38.json'
+    shell:
+        '''
+        piomart.py  gtf -u -species homo_sapiens -release release-93 -o homo_sapiens_grch38.gtf \
+        && piomart json -f homo_sapiens_grch38.gtf -o {output[0]}
+        '''
+
+# calculate normalized enrichment score 
+
+rule detk_enrich_PDX:
+    input:
+        gmt='data/cinsarc_geneset_tab.gmt',
+        
