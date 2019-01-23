@@ -20,6 +20,7 @@ rule detk_enrich_run:
             {input.gmt} {input.results}'
 
 
+########################################################################################
 
 
 # DE between the 3 SLX4IP deletion tumor samples and 4 that still have it
@@ -31,12 +32,13 @@ rule detk_enrich_run:
 
 rule count_matrix_filter:
     input:
-        'data/SLX4IP_counts_PDX.csv'
+        'data/SLX4IP_counts_PDX.csv',
+        'data/pheno_60_samples.csv'
     output:
         'data/SLX4IP_counts_PDX_filtered.csv'
     shell:
         '''
-        detk-filter -o {output} 'zero(all) == 0' {input} 
+        detk-filter -o {output} 'zero(group[OS]) == 0' {input[0]}  {input[1]}
         '''
 
 rule DE_in_PDX:
@@ -85,3 +87,4 @@ rule detk_enrich_PDX:
         detk-enrich fgsea -o {output} -i gene_name  -c SLX4IPstatus__normal__stat \
             {input.gmt} {input.results}
         '''
+
