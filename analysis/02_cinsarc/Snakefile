@@ -57,8 +57,19 @@ rule download_gtf:
         'homo_sapiens_grch38.json'
     shell:
         '''
-        piomart.py  gtf -u -species homo_sapiens -release release-93 -o homo_sapiens_grch38.gtf \
+        piomart  gtf -u --species homo_sapiens --release release-93 --output homo_sapiens_grch38.gtf \
         && piomart json -f homo_sapiens_grch38.gtf -o {output[0]}
+        '''
+
+rule annotated_deseq_results:
+    input:
+        'homo_sapiens_grch38.json',
+        'output/deseq2_SLX4IP_status_DE_results.csv'
+    output:
+        'output/deseq2_SLX4IP_status_DE_results_annotated.csv'
+    shell:
+        '''
+        piomart dataframe {input[1]} --offline -f {input[0]} --columns=gene_name --output={output[0]}
         '''
 
 # calculate normalized enrichment score 
@@ -66,4 +77,11 @@ rule download_gtf:
 rule detk_enrich_PDX:
     input:
         gmt='data/cinsarc_geneset_tab.gmt',
-        
+        results='output/deseq2_SLX4IP_status_DE_results_annotated.csv'
+    output:
+        'output/cinsarc_enrich_SLX4IP.txt'
+    shell:
+        '''
+        detk-enrich fgsea -o {output} -i gene_name  -c SLX4IPstatus__normal__stat \
+            {input.gmt} {input.results}
+        '''
