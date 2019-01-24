@@ -38,7 +38,7 @@ res %>%
   kable_styling()
 ```
 
-* The NES(normalized enrichment score) is 1.59, meaning there is correlation between positive log2 fold change of those leading edge genes and the loss of the SLX4IP genes (I'm using the normal group, the group that still has that gene as the control).
+* The NES(normalized enrichment score) is -1.59 and the padj is significant, meaning there is correlation between negative log2 fold change of those leading edge genes and the loss of the SLX4IP genes (The reference group is the normal group containing the samples that still have the gene).
 
 ## Leading edge genes
 
