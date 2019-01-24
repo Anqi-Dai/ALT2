@@ -84,7 +84,7 @@ rule detk_enrich_PDX:
         'output/cinsarc_enrich_SLX4IP.txt'
     shell:
         '''
-        detk-enrich fgsea -o {output} -i gene_name  -c SLX4IPstatus__normal__stat \
+        detk-enrich fgsea -o {output} -i gene_name  -c SLX4IPstatus__loss__stat \
             {input.gmt} {input.results}
         '''
 
