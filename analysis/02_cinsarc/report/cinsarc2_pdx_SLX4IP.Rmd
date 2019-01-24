@@ -1,0 +1,79 @@
+---
+title: "Enrichment of Cinsarc signature in DE result between loss and normal SLX4IP in PDX samples"
+mainfont: Calibri Light 
+author: Angel
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    theme: united
+    code_folding: hide
+---
+```{r setup, include=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning = FALSE)
+library(tidyverse)
+library(kableExtra)
+library(knitr)
+library(biomaRt)
+```
+
+
+
+## Processing steps 
+
+* Filtering on the raw salmon count data to remove genes with any zero in the OS samples.
+* Doing deseq2 differential expression between the samples that lost SLX4IP (OS17,OS29,OS9 ) and others that still have that gene.
+* Geneset Enrichment analysis(the Broad algorithm) to see the enrichment of Cinsarc signature.
+
+
+## Enrichment result
+
+```{r}
+res <- read_csv('../output/cinsarc_enrich_SLX4IP.txt')
+```
+```{r}
+res %>%
+  dplyr::select(-leadingEdge) %>%
+  kable(caption = 'Enrichment of Cinsarc signature') %>%
+  kable_styling()
+```
+
+* The NES(normalized enrichment score) is 1.59, meaning there is correlation between positive log2 fold change of those leading edge genes and the loss of the SLX4IP genes (I'm using the normal group, the group that still has that gene as the control).
+
+## Leading edge genes
+
+```{r}
+leadingEdge <- res %>%
+  pull(leadingEdge) %>%
+  stringr::str_split_fixed(' ', n = 30) %>%
+  t() %>%
+  as.tibble %>%
+  filter(V1 != '') %>%
+  dplyr::select(gene_name = V1)
+
+```
+
+```{r}
+# retrieve gene information from biomart
+mart <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+
+# the ensembl_gene_id of the genes that you are interested in 
+genes <- leadingEdge$gene_name
+
+# retrieve the feature information of the listed attributes
+symbol <- getBM(filters = "external_gene_name",
+                attributes = c('ensembl_gene_id','external_gene_name',
+                               'chromosome_name','start_position','end_position', 'description'),
+                
+                values = genes, 
+                mart = mart) %>%
+  filter(!grepl(pattern = 'CHR',x = chromosome_name))
+
+# show the table
+symbol %>%
+  rename(chr = chromosome_name) %>%
+  kable(caption = 'Feature information of the leading edge genes') %>%
+  kable_styling()
+```
+
+

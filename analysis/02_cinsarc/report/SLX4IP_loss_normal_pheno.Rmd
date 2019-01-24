@@ -1,0 +1,30 @@
+---
+title: "Make SLX4IP loss and normal pheno table for PDX samples"
+output: html_notebook
+---
+
+```{r}
+library(Biobase)
+```
+
+
+```{r}
+# create a pheno table for the PDX samples in terms of the SLX4IP loss
+# in the 60 samples
+
+raw <- readRDS('../../../samples/RAW_whole_eset_60samples_57955features.RDS')
+
+pheno <- pData(raw)[pData(raw)$group == 'OS',]
+
+
+Loss_sample_names <- rownames(pheno)[grepl('OS17|OS29|OS9',rownames(pheno) ) ]
+
+pheno$SLX4IPstatus <- ifelse(rownames(pheno) %in% Loss_sample_names, 'loss','normal')
+
+write.csv(pheno[,c('SLX4IPstatus','batch')], '../data/SLX4IP_pheno_PDX.csv', quote = F)
+
+
+write.csv(exprs(raw), '../data/SLX4IP_counts_PDX.csv', quote = F)
+
+```
+
