@@ -49,7 +49,7 @@ rule DE_in_PDX:
         'output/deseq2_SLX4IP_status_DE_results.csv'
     shell:
         '''
-        detk-de deseq2 "counts ~ SLX4IPstatus + batch " {input.cts} {input.pheno} > {output}
+        detk-de deseq2 "counts ~ SLX4IPstatus[normal] + batch " {input.cts} {input.pheno} > {output}
         '''
 
 # annotate the deseq2 results using piomart. Thank you Diego!
